@@ -192,11 +192,10 @@ export default function Home() {
               <div className="grid md:grid-cols-2 gap-0">
                 {posts[0].image ? (
                   <div className="relative h-80 md:h-auto overflow-hidden bg-muted">
-                    <Image
+                    <img
                       src={posts[0].image}
                       alt={posts[0].title}
-                      width={500}
-                      height={500}
+
                       className="h-full w-full object-cover"
                     />
                     <Badge className="absolute top-4 left-4">Featured</Badge>
@@ -262,11 +261,10 @@ export default function Home() {
                   <Card key={post.id} className="flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
                     {post.image ? (
                       <div className="relative h-48 w-full overflow-hidden bg-muted">
-                        <Image
+                        <img
                           src={post.image}
                           alt={post.title}
-                          width={500}
-                          height={500}
+    
                           className="h-full w-full object-cover hover:scale-105 transition-transform duration-300"
                         />
                       </div>
