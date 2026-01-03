@@ -45,43 +45,60 @@ const isAllowedRoute = (path: string, allowedRoutes: string[]) => {
 };
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  if (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/api") ||
-    pathname.includes(".")
-  ) {
-    return NextResponse.next();
-  }
-
-  const isAuth = isAuthRoute(pathname);
-
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
-
-  if (isAuth) {
-    if (token) {
-      return NextResponse.redirect(new URL("/", req.url));
+    const { pathname } = req.nextUrl;
+    
+    // Get the correct base URL - prioritize NEXTAUTH_URL, then BASE_URL, then request host
+    let baseUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL;
+    
+    if (!baseUrl) {
+        // Fallback to request host
+        const host = req.headers.get('host');
+        const protocol = req.headers.get('x-forwarded-proto') || 'http';
+        baseUrl = `${protocol}://${host}`;
     }
+    
+    // Ensure baseUrl has proper protocol
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+        baseUrl = `http://${baseUrl}`;
+    }
+
+    if (
+        pathname.startsWith("/_next") ||
+        pathname.startsWith("/api") ||
+        pathname.includes(".")
+    ) {
+        return NextResponse.next();
+    }
+
+    const isAuth = isAuthRoute(pathname);
+    const token = await getToken({ 
+        req, 
+        secret: process.env.AUTH_SECRET 
+    });
+
+    if (isAuth) {
+        if (token) {
+            return NextResponse.redirect(new URL("/", baseUrl));
+        }
+        return NextResponse.next();
+    }
+
+    if (isPublicRoute(pathname)) {
+        return NextResponse.next();
+    }
+
+    if (!token) {
+        return NextResponse.redirect(new URL("/login", baseUrl));
+    }
+
+    const userRole = token.role as string | undefined;
+    const allowedRoutes = roleBasedRoutes[userRole || ""] || [];
+
+    if (!isAllowedRoute(pathname, allowedRoutes)) {
+        return NextResponse.redirect(new URL("/", baseUrl));
+    }
+
     return NextResponse.next();
-  }
-
-  if (isPublicRoute(pathname)) {
-    return NextResponse.next();
-  }
-
-  if (!token) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-
-  const userRole = token.role as string | undefined;
-  const allowedRoutes = roleBasedRoutes[userRole || ""] || [];
-
-  if (!isAllowedRoute(pathname, allowedRoutes)) {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
-
-  return NextResponse.next();
 }
 
 export const config = {
