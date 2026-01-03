@@ -1,4 +1,5 @@
 module.exports = {
+<<<<<<< Updated upstream
   apps: [{
     name: 'nextjs-app',
     script: 'node_modules/next/dist/bin/next',
@@ -15,3 +16,16 @@ module.exports = {
     },
   }],
 }
+=======
+    apps: [{
+        name: "nextcrud",
+        script: "npm",
+        args: "start",
+        env: {
+            NODE_ENV: "production",
+            HOST: "0.0.0.0",  // CRITICAL: Listen on all interfaces
+            PORT: 3000
+        }
+    }]
+}
+>>>>>>> Stashed changes
