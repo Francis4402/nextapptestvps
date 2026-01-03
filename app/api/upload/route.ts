@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir, unlink  } from 'fs/promises'
+import { writeFile, mkdir, unlink, access, constants } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import sharp from 'sharp'
+
+// Helper function to ensure upload directory exists
+async function ensureUploadsDirectory() {
+  // Determine the base path based on environment
+  const basePath = process.cwd()
+  const uploadsDir = join(basePath, 'public', 'uploads')
+  
+  try {
+    // Check if directory exists
+    await access(uploadsDir, constants.F_OK)
+  } catch (error) {
+    // Directory doesn't exist, create it
+    console.log(`Creating uploads directory at: ${uploadsDir}`)
+    await mkdir(uploadsDir, { recursive: true })
+  }
+  
+  return uploadsDir
+}
 
 // Helper function to safely delete image file
 async function deleteImageFile(imageUrl: string | null) {
@@ -13,7 +31,8 @@ async function deleteImageFile(imageUrl: string | null) {
     const filename = imageUrl.split('/').pop()
     if (!filename) return
     
-    const filePath = join(process.cwd(), 'public', 'uploads', filename)
+    const uploadsDir = await ensureUploadsDirectory()
+    const filePath = join(uploadsDir, filename)
     
     // Check if file exists and delete it
     if (existsSync(filePath)) {
@@ -28,6 +47,9 @@ async function deleteImageFile(imageUrl: string | null) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Ensure upload directory exists
+    await ensureUploadsDirectory()
+    
     const formData = await req.formData()
     const file = formData.get('file') as File
 
@@ -56,9 +78,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Convert file to buffer - FIXED TYPE ISSUE
+    // Convert file to buffer
     const bytes = await file.arrayBuffer()
-    // Create a proper ArrayBuffer view
     const arrayBuffer = bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes).buffer
     let buffer = Buffer.from(arrayBuffer)
 
@@ -108,11 +129,10 @@ export async function POST(req: NextRequest) {
             buffer = Buffer.from(await sharpInstance
               .webp({ 
                 quality,
-                effort: 6 // Maximum compression effort
+                effort: 6
               })
               .toBuffer());
           } else if (metadata.format === 'gif') {
-            // For GIFs, we can convert to WebP for better compression
             buffer = Buffer.from(await sharpInstance
               .webp({ 
                 quality: 80,
@@ -125,41 +145,37 @@ export async function POST(req: NextRequest) {
         }
       } catch (error) {
         console.error('Server-side compression failed:', error);
-        // Continue with original buffer
       }
     }
 
     // Generate unique filename
     const timestamp = Date.now()
     const randomString = Math.random().toString(36).substring(2, 15)
-    const originalName = file.name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-.]/g, '')
     
     // Determine extension based on format
     const metadata = await sharp(buffer).metadata();
     const extension = metadata.format || file.name.split('.').pop() || 'jpg';
     const filename = `${timestamp}-${randomString}.${extension}`
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads')
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
-    }
+    // Get uploads directory path
+    const uploadsDir = await ensureUploadsDirectory()
 
     // Save file to public/uploads
     const filePath = join(uploadsDir, filename)
     await writeFile(filePath, buffer)
 
-    // Return the URL path
+    // Return the URL path - use relative path for Next.js
     const url = `/uploads/${filename}`
 
     return NextResponse.json({ 
       url,
       filename,
-      size: buffer.length, // Return actual saved size
+      size: buffer.length,
       originalSize: file.size,
       type: file.type,
       compressed: buffer.length < file.size,
-      compressionRatio: Math.round((1 - buffer.length / file.size) * 100)
+      compressionRatio: Math.round((1 - buffer.length / file.size) * 100),
+      filePath: url // Return the relative path
     })
 
   } catch (error) {
