@@ -9,16 +9,25 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import { X, Image as ImageIcon } from 'lucide-react'
+import { X, Image as ImageIcon, Upload, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createPost, updatePost } from '@/app/services/postservices'
 import { useRouter } from 'next/navigation'
 import { postValidation, PostValidation } from '../postvalidation/postvalidation'
 import { PostFormProps } from '@/app/types'
+import imageCompression from 'browser-image-compression'
+import { uploadImage, validateImageFile } from '@/app/services/uploadservices'
+
 
 const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFormProps) => {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState(initialData?.image || '')
+  const [isUploading, setIsUploading] = useState(false)
+  const [compressionInfo, setCompressionInfo] = useState<{
+    originalSize: number
+    compressedSize: number
+    compressionRatio: number
+  } | null>(null)
 
   const router = useRouter()
 
@@ -33,77 +42,132 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
 
   const { formState: { isSubmitting } } = form
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload a valid image file')
+    // Clear previous compression info
+    setCompressionInfo(null)
+
+    // Validate file
+    const validation = validateImageFile(file)
+    if (!validation.valid) {
+      toast.error(validation.error || 'Invalid file')
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB')
-      return
+    // Show compression message if needed
+    if (file.size > 2 * 1024 * 1024) {
+      toast.info('Large image detected. It will be compressed to under 2MB.')
     }
 
-    // Store the file for later upload
-    setImageFile(file)
-
-    // Create preview URL
-    const previewUrl = URL.createObjectURL(file)
-    setImagePreview(previewUrl)
-    
-    toast.success('Image selected. It will be uploaded when you submit the post.')
+    try {
+      // Create preview (compressed for faster loading)
+      const previewToastId = toast.loading('Generating preview...')
+      
+      const previewFile = await imageCompression(file, {
+        maxSizeMB: 1, // Smaller for preview
+        maxWidthOrHeight: 800,
+        useWebWorker: true,
+        fileType: file.type,
+      })
+      
+      const previewUrl = URL.createObjectURL(previewFile)
+      setImagePreview(previewUrl)
+      
+      // Store the original file for upload
+      setImageFile(file)
+      
+      toast.dismiss(previewToastId)
+      toast.success('Image selected successfully')
+      
+      // Calculate and show compression info
+      if (file.size > 2 * 1024 * 1024) {
+        const compressedPreview = await imageCompression(file, {
+          maxSizeMB: 2,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+          initialQuality: 0.8,
+        })
+        
+        setCompressionInfo({
+          originalSize: file.size,
+          compressedSize: compressedPreview.size,
+          compressionRatio: Math.round((1 - compressedPreview.size / file.size) * 100)
+        })
+      }
+      
+    } catch (error) {
+      console.error('Error processing image:', error)
+      toast.error('Failed to process image')
+    }
   }
 
   const clearImage = () => {
+    // Clean up preview URL
     if (imagePreview && imagePreview.startsWith('blob:')) {
       URL.revokeObjectURL(imagePreview)
     }
+    
     setImageFile(null)
     setImagePreview('')
+    setCompressionInfo(null)
     form.setValue('image', '')
-  }
-
-  const uploadImage = async (file: File): Promise<string> => {
-    const formData = new FormData()
-    formData.append('file', file)
-
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    })
-
-    if (!response.ok) {
-      throw new Error('Upload failed')
+    
+    // Reset file input
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    if (fileInput) {
+      fileInput.value = ''
     }
-
-    const data = await response.json()
-    return data.url
   }
 
   const onSubmit: SubmitHandler<PostValidation> = async (data) => {
     try {
       let imageUrl = data.image || null
+      let uploadError = false
 
       // Upload image only if a new file is selected
       if (imageFile) {
-        toast.info('Uploading image...')
-        imageUrl = await uploadImage(imageFile)
+        setIsUploading(true)
+        const uploadToastId = toast.loading('Compressing and uploading image...')
+        
+        try {
+          const uploadResult = await uploadImage(imageFile)
+          imageUrl = uploadResult.url
+          
+          toast.success('Image uploaded successfully', { 
+            id: uploadToastId,
+            description: compressionInfo 
+              ? `Compressed from ${(compressionInfo.originalSize / 1024 / 1024).toFixed(1)}MB to ${(compressionInfo.compressedSize / 1024 / 1024).toFixed(1)}MB (${compressionInfo.compressionRatio}% reduction)`
+              : undefined
+          })
+        } catch (error: any) {
+          toast.error('Failed to upload image', { 
+            id: uploadToastId,
+            description: error.message || 'Please try again with a different image'
+          })
+          uploadError = true
+          setIsUploading(false)
+          return // Stop form submission if image upload fails
+        } finally {
+          setIsUploading(false)
+        }
+      }
+
+      // Prepare post data
+      const postData = {
+        title: data.title,
+        content: data.content,
+        image: imageUrl,
       }
 
       if (mode === 'create') {
-        const result = await createPost({
-          title: data.title,
-          content: data.content,
-          image: imageUrl,
-        } as any)
-
+        const result = await createPost(postData as any)
+        
         if (result) {
           toast.success('Post created successfully')
           
-          // Clean up preview URL
+          // Clean up
           if (imagePreview && imagePreview.startsWith('blob:')) {
             URL.revokeObjectURL(imagePreview)
           }
@@ -111,6 +175,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
           form.reset()
           setImageFile(null)
           setImagePreview('')
+          setCompressionInfo(null)
           router.push('/')
         } else {
           toast.error('Failed to create post')
@@ -118,9 +183,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
       } else {
         const result = await updatePost({
           id: initialData?.id,
-          title: data.title,
-          content: data.content,
-          image: imageUrl,
+          ...postData,
         } as any)
 
         if (result) {
@@ -138,8 +201,14 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
       }
     } catch (error: any) {
       console.error('Error submitting form:', error)
-      toast.error(error.message || 'An error occurred')
+      toast.error(error.message || 'An error occurred while saving the post')
     }
+  }
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB'
   }
 
   return (
@@ -169,6 +238,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                         {...field} 
                         value={field.value || ''} 
                         placeholder="Enter your post title" 
+                        disabled={isSubmitting || isUploading}
                       />
                     </FormControl>
                     <FormDescription>
@@ -191,6 +261,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                         value={field.value || ''} 
                         placeholder="Write your post content here..."
                         className="min-h-[250px] resize-y"
+                        disabled={isSubmitting || isUploading}
                       />
                     </FormControl>
                     <FormDescription className="flex justify-between">
@@ -216,7 +287,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                               type="file"
                               accept="image/*"
                               onChange={handleImageSelect}
-                              disabled={isSubmitting}
+                              disabled={isSubmitting || isUploading}
                               className="cursor-pointer"
                             />
                           </div>
@@ -226,13 +297,42 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                               variant="outline" 
                               size="icon"
                               onClick={clearImage}
-                              disabled={isSubmitting}
+                              disabled={isSubmitting || isUploading}
                             >
                               <X className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
 
+                        {/* Compression Info */}
+                        {compressionInfo && (
+                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+                            <div className="flex items-center justify-between text-sm">
+                              <div className="flex items-center gap-2">
+                                <Upload className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <span className="font-medium">Compression Applied</span>
+                              </div>
+                              <span className="text-blue-700 dark:text-blue-300 font-semibold">
+                                {compressionInfo.compressionRatio}% smaller
+                              </span>
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                              <div>
+                                <span className="font-medium">Original:</span>{' '}
+                                {formatFileSize(compressionInfo.originalSize)}
+                              </div>
+                              <div>
+                                <span className="font-medium">After compression:</span>{' '}
+                                {formatFileSize(compressionInfo.compressedSize)}
+                              </div>
+                            </div>
+                            <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                              Image will be automatically optimized for web
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Image Preview */}
                         {imagePreview ? (
                           <div className="relative rounded-lg border overflow-hidden bg-muted">
                             <img 
@@ -246,7 +346,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                             />
                             {imageFile && (
                               <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                                Will be uploaded on submit
+                                Will be compressed and uploaded on submit
                               </div>
                             )}
                           </div>
@@ -258,7 +358,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                                 No image selected
                               </p>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                PNG, JPG, WEBP up to 5MB
+                                PNG, JPG, WEBP up to 10MB (will be compressed to under 2MB)
                               </p>
                             </div>
                           </div>
@@ -266,7 +366,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                       </div>
                     </FormControl>
                     <FormDescription>
-                      Select an image for your post (max 5MB). It will be uploaded when you submit.
+                      Select an image for your post. Large images will be automatically compressed.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -277,10 +377,18 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                 <Button 
                   type="submit" 
                   className="flex-1" 
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isUploading}
                 >
-                  {isSubmitting ? (
-                    imageFile ? 'Uploading & Saving...' : 'Saving...'
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Compressing & Uploading Image...
+                    </>
+                  ) : isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {mode === 'create' ? 'Creating Post...' : 'Updating Post...'}
+                    </>
                   ) : (
                     mode === 'create' ? 'Create Post' : 'Update Post'
                   )}
@@ -296,14 +404,14 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                     }
                     router.back()
                   }}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isUploading}
                 >
                   Cancel
                 </Button>
               </div>
 
               <div className="text-center text-sm text-muted-foreground">
-                Fields marked with * are required
+                Fields marked with * are required. Images over 2MB will be automatically compressed.
               </div>
             </form>
           </Form>

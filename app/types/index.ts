@@ -1,3 +1,11 @@
+export interface CompressedImageInfo {
+  originalSize: number;
+  compressedSize: number;
+  compressionRatio: number;
+  url: string;
+  filename: string;
+}
+
 export interface PostFormProps {
     className?: string;
     initialData?: {

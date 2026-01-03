@@ -21,6 +21,7 @@ import { Calendar, Clock, Image as ImageIcon, MoreVertical, Edit, Trash2, Plus }
 import { toast } from 'sonner'
 import { deleteAllPosts, deletePost, getPosts } from '@/app/services/postservices'
 import { Post } from '@/app/types'
+import Image from 'next/image'
 
 
 
@@ -191,9 +192,11 @@ export default function Home() {
               <div className="grid md:grid-cols-2 gap-0">
                 {posts[0].image ? (
                   <div className="relative h-80 md:h-auto overflow-hidden bg-muted">
-                    <img
+                    <Image
                       src={posts[0].image}
                       alt={posts[0].title}
+                      width={500}
+                      height={500}
                       className="h-full w-full object-cover"
                     />
                     <Badge className="absolute top-4 left-4">Featured</Badge>
@@ -346,7 +349,7 @@ export default function Home() {
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive hover:bg-destructive/90"
             >
               {isDeleting ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
