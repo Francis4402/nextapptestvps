@@ -1,9 +1,11 @@
+import AllPosts from './utils/loadpost/AllPosts'
 
-
-export default function Home() {
+const Home = () => {
   return (
     <div>
-      <h1>Welcome to the Home Page</h1>
+      <AllPosts />
     </div>
-  );
+  )
 }
+
+export default Home
