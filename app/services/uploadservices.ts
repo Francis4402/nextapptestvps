@@ -78,20 +78,46 @@ export const uploadImage = async (file: File): Promise<UploadResponse> => {
     formData.append('originalSize', file.size.toString())
     formData.append('processedSize', processedFile.size.toString())
 
-    const response = await fetch('/api/upload', {
+    // DEBUG: Log the API URL
+    const apiUrl = '/api/upload';
+    console.log('Uploading to:', apiUrl);
+    console.log('File size:', processedFile.size, 'bytes');
+    console.log('File type:', processedFile.type);
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       body: formData,
+      // Don't set Content-Type header for FormData - let browser set it
     })
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+    // Check if response is HTML (error)
+    const contentType = response.headers.get('content-type');
+    console.log('Content-Type:', contentType);
+
+    if (!contentType || !contentType.includes('application/json')) {
+      // Try to read as text to see what's wrong
+      const text = await response.text();
+      console.error('Non-JSON response:', text.substring(0, 500));
+      
+      if (text.includes('<html') || text.includes('<!DOCTYPE')) {
+        throw new Error(`Server returned HTML page. Check if /api/upload route exists.`);
+      }
+      throw new Error(`Invalid response type: ${contentType}`);
+    }
 
     if (!response.ok) {
       const errorData = await response.json()
-      throw new Error(errorData.error || 'Upload failed')
+      throw new Error(errorData.error || `Upload failed with status ${response.status}`)
     }
 
     const data: UploadResponse = await response.json()
+    console.log('Upload successful:', data);
     return data
   } catch (error) {
-    console.error('Upload error:', error)
+    console.error('Upload error details:', error)
     throw error
   }
 }
