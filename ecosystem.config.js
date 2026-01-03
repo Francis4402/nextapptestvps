@@ -1,19 +1,30 @@
+// ecosystem.config.js - Accepts command line arguments
+const path = require('path');
+
+// Get arguments from command line
+const args = process.argv.slice(2);
+const port = args.includes('--port') 
+  ? args[args.indexOf('--port') + 1] 
+  : 3000;
+
 module.exports = {
-  apps: [{
-    name: 'nextcrud',
-    script: 'node_modules/.bin/next',
-    args: 'start',
-        cwd: './',
-    instances: 1,
-    autorestart: true,
-    watch: false,
-    max_memory_restart: '1G',
-    env: {
-      NODE_ENV: 'production',
-      NEXTAUTH_URL: 'http://161.248.189.254',
-      BASE_URL: 'http://161.248.189.254',
-      AUTH_SECRET: 'AlrOXky/cWk6Upv4shZCR/xXZQ8eghMk01Tzo/9knk4=',
-      DATABASE_URL: 'postgres://francism:456123@localhost:5432/nextcrud?schema=public'
-    }
-  }]
-}
+  apps: [
+    {
+      name: 'nextjs-app',
+      script: 'next',
+      args: `start -p ${port}`,
+      cwd: __dirname, // Directory where ecosystem.config.js is located
+      instances: 'max',
+      exec_mode: 'cluster',
+      env: {
+        NODE_ENV: 'production',
+        PORT: port,
+        HOST: '0.0.0.0',
+      },
+      // Use absolute paths for logs
+      error_file: path.join(__dirname, 'logs/err.log'),
+      out_file: path.join(__dirname, 'logs/out.log'),
+      log_date_format: 'YYYY-MM-DD HH:mm Z',
+    },
+  ],
+};
