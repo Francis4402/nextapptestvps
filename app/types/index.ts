@@ -12,7 +12,7 @@ export interface PostFormProps {
         id?: string;
         title?: string;
         content?: string;
-        image?: string | null;
+        image?: string[] | null;
     };
     mode?: 'create' | 'edit';
 }
@@ -21,7 +21,7 @@ export interface Post {
   id: string
   title: string
   content: string
-  image?: string | null
+  images?: string[] // Array of image URLs
   createdAt: Date
   updatedAt: Date
 }

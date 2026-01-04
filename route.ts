@@ -1,18 +1,13 @@
 export const publicRoutes = [
     "/forgot-password", "/reset-password",
-    "/posts",
-    "/posts/:id",
-    "/api/posts",
-    "/api/posts/:id",
-    "/uploads/:filename",
 ];
 
 export const adminRoutes = [
-    "/"
+    "/", "/:id", "/post", "/post/:id",
 ];
 
 export const userRoutes = [
-    "/", "/:id"
+   "/", "/:id", "/post", "/post/:id",
 ];
 
 

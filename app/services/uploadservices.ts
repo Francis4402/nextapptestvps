@@ -1,11 +1,15 @@
 // services/uploadService.ts
-import imageCompression from 'browser-image-compression';
+import imageCompression from 'browser-image-compression'
 
 interface UploadResponse {
   url: string
   filename: string
   size: number
+  originalSize: number
   type: string
+  compressed: boolean
+  compressionRatio: number
+  name: string
 }
 
 interface UploadError {
@@ -16,40 +20,37 @@ interface UploadError {
 const compressionOptions = {
   maxSizeMB: 2, // Max size in MB
   maxWidthOrHeight: 1920, // Max dimension
-  useWebWorker: true, // Use web worker for better performance
-  fileType: 'image/jpeg', // Convert to JPEG for better compression
-  initialQuality: 0.8, // Initial quality (0.8 = 80%)
+  useWebWorker: true,
+  fileType: 'image/jpeg',
+  initialQuality: 0.8,
   alwaysKeepResolution: true,
 }
 
 export const compressImageIfNeeded = async (file: File): Promise<File> => {
   // Only compress if file is over 2MB
   if (file.size <= 2 * 1024 * 1024) {
-    return file;
+    return file
   }
 
   try {
-    console.log(`Compressing image from ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`Compressing image from ${(file.size / 1024 / 1024).toFixed(2)}MB`)
     
     const compressedFile = await imageCompression(file, {
       ...compressionOptions,
-      // Adjust quality based on original file size
       initialQuality: Math.max(0.5, 1 - (file.size - 2 * 1024 * 1024) / (10 * 1024 * 1024)),
-    });
+    })
 
-    console.log(`Compressed to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`Compressed to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`)
     
-    return compressedFile;
+    return compressedFile
   } catch (error) {
-    console.error('Compression failed:', error);
-    // Return original file if compression fails
-    return file;
+    console.error('Compression failed:', error)
+    return file
   }
 }
 
 export const validateImageFile = (file: File): { valid: boolean; error?: string } => {
-  // Validate file type
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
   if (!file.type.startsWith('image/') || !allowedTypes.includes(file.type)) {
     return { 
       valid: false, 
@@ -68,44 +69,69 @@ export const validateImageFile = (file: File): { valid: boolean; error?: string 
   return { valid: true }
 }
 
-export const uploadImage = async (file: File): Promise<UploadResponse> => {
+export const validateMultipleImages = (files: File[]): { valid: boolean; error?: string } => {
+  // Check maximum number of images
+  if (files.length > 5) {
+    return {
+      valid: false,
+      error: 'Maximum 5 images allowed'
+    }
+  }
+
+  // Check total size (max 20MB for all images)
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+  const MAX_TOTAL_SIZE = 20 * 1024 * 1024 // 20MB
+  if (totalSize > MAX_TOTAL_SIZE) {
+    return {
+      valid: false,
+      error: 'Total image size must be less than 20MB'
+    }
+  }
+
+  // Validate each file
+  for (const file of files) {
+    const validation = validateImageFile(file)
+    if (!validation.valid) {
+      return validation
+    }
+  }
+
+  return { valid: true }
+}
+
+export const uploadMultipleImages = async (files: File[]): Promise<UploadResponse[]> => {
   try {
-    // Compress image if needed
-    const processedFile = await compressImageIfNeeded(file);
+    const processedFiles = await Promise.all(
+      files.map(file => compressImageIfNeeded(file))
+    )
 
     const formData = new FormData()
-    formData.append('file', processedFile)
-    formData.append('originalSize', file.size.toString())
-    formData.append('processedSize', processedFile.size.toString())
+    processedFiles.forEach((file, index) => {
+      formData.append('files', file)
+    })
 
     // DEBUG: Log the API URL
-    const apiUrl = '/api/upload';
-    console.log('Uploading to:', apiUrl);
-    console.log('File size:', processedFile.size, 'bytes');
-    console.log('File type:', processedFile.type);
+    const apiUrl = '/api/upload'
+    console.log('Uploading to:', apiUrl)
+    console.log('Files to upload:', processedFiles.length)
 
     const response = await fetch(apiUrl, {
       method: 'POST',
       body: formData,
-      // Don't set Content-Type header for FormData - let browser set it
     })
 
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    console.log('Response status:', response.status)
 
-    // Check if response is HTML (error)
-    const contentType = response.headers.get('content-type');
-    console.log('Content-Type:', contentType);
-
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type')
     if (!contentType || !contentType.includes('application/json')) {
-      // Try to read as text to see what's wrong
-      const text = await response.text();
-      console.error('Non-JSON response:', text.substring(0, 500));
+      const text = await response.text()
+      console.error('Non-JSON response:', text.substring(0, 500))
       
       if (text.includes('<html') || text.includes('<!DOCTYPE')) {
-        throw new Error(`Server returned HTML page. Check if /api/upload route exists.`);
+        throw new Error('Server returned HTML page. Check if /api/upload route exists.')
       }
-      throw new Error(`Invalid response type: ${contentType}`);
+      throw new Error(`Invalid response type: ${contentType}`)
     }
 
     if (!response.ok) {
@@ -113,23 +139,34 @@ export const uploadImage = async (file: File): Promise<UploadResponse> => {
       throw new Error(errorData.error || `Upload failed with status ${response.status}`)
     }
 
-    const data: UploadResponse = await response.json()
-    console.log('Upload successful:', data);
-    return data
+    const data = await response.json()
+    console.log('Upload successful:', data)
+    
+    // Handle both single and multiple file responses
+    if (Array.isArray(data)) {
+      return data
+    } else {
+      return [data]
+    }
   } catch (error) {
     console.error('Upload error details:', error)
     throw error
   }
 }
 
-export const deleteImage = async (imageUrl: string): Promise<boolean> => {
+export const uploadImage = async (file: File): Promise<UploadResponse> => {
+  const results = await uploadMultipleImages([file])
+  return results[0]
+}
+
+export const deleteImages = async (imageUrls: string[]): Promise<boolean> => {
   try {
     const response = await fetch('/api/upload', {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ url: imageUrl }),
+      body: JSON.stringify({ urls: imageUrls }),
     })
 
     if (!response.ok) {
@@ -141,4 +178,8 @@ export const deleteImage = async (imageUrl: string): Promise<boolean> => {
     console.error('Delete error:', error)
     return false
   }
+}
+
+export const deleteImage = async (imageUrl: string): Promise<boolean> => {
+  return deleteImages([imageUrl])
 }

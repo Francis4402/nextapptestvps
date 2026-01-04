@@ -41,11 +41,9 @@ export const getPost = async (id: string) => {
     }
 }
 
-export const createPost = async (posts: PostFormProps) => {
+export const createPost = async (postData: PostFormProps) => {
     try {
-        
-        const session = await getServerSession(authOptions);
-
+        const session = await getServerSession(authOptions)
 
         const res = await fetch(`${baseUrl}/api/posts`, {
             method: 'POST',
@@ -53,39 +51,47 @@ export const createPost = async (posts: PostFormProps) => {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${session?.accessToken}`,
             },
-            body: JSON.stringify(posts),
+            body: JSON.stringify(postData),
             cache: 'no-store',
-        });
+        })
 
-        
-        const data = await res.json();
+        const data = await res.json()
 
         if (!res.ok) {
-            throw new Error(data.error || 'Failed to create post');
+            throw new Error(data.error || 'Failed to create post')
         }
 
-        return data;
+        return data
     } catch (error) {
         console.error("Service error:", error)
+        throw error
     }
 }
 
-
-export const updatePost = async (posts: PostFormProps) => {
+export const updatePost = async (postData: PostFormProps & { id: string }) => {
     try {
-        const res = await fetch(`${baseUrl}/api/posts/${posts.initialData?.id}`, {
+        const session = await getServerSession(authOptions)
+
+        const res = await fetch(`${baseUrl}/api/posts`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
+                Authorization: `Bearer ${session?.accessToken}`,
             },
-            body: JSON.stringify(posts),
+            body: JSON.stringify(postData),
             cache: 'no-store',
-        });
+        })
 
+        const data = await res.json()
 
-        return res.json();
+        if (!res.ok) {
+            throw new Error(data.error || 'Failed to update post')
+        }
+
+        return data
     } catch (error) {
-        console.log(error);
+        console.error("Service error:", error)
+        throw error
     }
 }
 

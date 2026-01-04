@@ -24,15 +24,19 @@ export async function DELETE() {
     
     // Collect all image URLs from posts
     const imageUrls = allPosts
-      .filter(post => post.image && typeof post.image === 'string')
-      .map(post => post.image as string);
+      .filter(post => post.images)
+      .flatMap(post => {
+        try {
+          const images = typeof post.images === 'string' ? JSON.parse(post.images) : post.images;
+          return Array.isArray(images) ? images : [];
+        } catch {
+          return [];
+        }
+      });
     
-    console.log(`Found ${imageUrls.length} images to delete`);
-    console.log('Image URLs:', imageUrls); // Debug log
     
     // Delete all posts from database
     await db.delete(postTable);
-    console.log('Posts deleted from database');
     
     // Delete associated image files
     let imagesDeleted = 0;
@@ -69,7 +73,6 @@ export async function DELETE() {
         if (existsSync(filePath)) {
           await unlink(filePath);
           imagesDeleted++;
-          console.log(`✓ Deleted: ${filename}`);
           return { success: true, filename };
         } else {
           console.warn(`File not found: ${filePath}`);

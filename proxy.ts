@@ -44,7 +44,7 @@ const isAllowedRoute = (path: string, allowedRoutes: string[]) => {
   });
 };
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
     const { pathname } = req.nextUrl;
     
     // Get the correct base URL - prioritize NEXTAUTH_URL, then BASE_URL, then request host
