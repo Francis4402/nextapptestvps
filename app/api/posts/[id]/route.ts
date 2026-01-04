@@ -72,6 +72,7 @@ export async function DELETE(req: NextRequest) {
     
     try {
         const id = req.nextUrl.pathname.split("/").pop();
+        
         if (!id) {
             return NextResponse.json({ error: 'No post ID provided' }, { status: 400 });
         }
@@ -135,31 +136,38 @@ export async function DELETE(req: NextRequest) {
     }
 }
 
-// Improved helper function with better error handling
+// Updated helper function to handle both URL formats
 async function deleteImageFile(imageUrl: string) {
     try {
-        // Validate URL format
-        if (!imageUrl.startsWith('/uploads/')) {
+        let filename: string;
+
+        // Handle both URL formats: /uploads/filename.jpg and /api/images/filename.jpg
+        if (imageUrl.startsWith('/api/images/')) {
+            filename = imageUrl.substring('/api/images/'.length);
+        } else if (imageUrl.startsWith('/uploads/')) {
+            filename = imageUrl.substring('/uploads/'.length);
+        } else {
             return {
                 success: false,
                 error: 'Invalid image URL format'
             };
         }
 
-        // Extract filename safely
-        const filename = imageUrl.substring('/uploads/'.length);
-        if (!filename || filename.includes('..')) {
+        // Security check
+        if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
             return {
                 success: false,
                 error: 'Invalid filename'
             };
         }
 
-        const uploadsDir = join(process.cwd(), 'public', 'uploads');
-        const filePath = join(uploadsDir, filename);
+        // Use the UPLOAD_DIR (same as in upload route)
+        const UPLOAD_DIR = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
+        const filePath = join(UPLOAD_DIR, filename);
         
         // Check if file exists
         if (!existsSync(filePath)) {
+            console.warn(`Image file not found: ${filePath}`);
             return {
                 success: false,
                 error: 'Image file not found',
@@ -169,6 +177,7 @@ async function deleteImageFile(imageUrl: string) {
 
         // Delete the file
         await unlink(filePath);
+        console.log(`Successfully deleted image: ${filename}`);
         
         return {
             success: true,

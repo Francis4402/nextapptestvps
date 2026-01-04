@@ -4,6 +4,7 @@ import { join } from 'path'
 import { existsSync } from 'fs'
 import sharp from 'sharp'
 
+
 // Helper function to safely delete image file
 async function deleteImageFile(imageUrl: string | null) {
   if (!imageUrl) return
@@ -13,7 +14,7 @@ async function deleteImageFile(imageUrl: string | null) {
     const filename = imageUrl.split('/').pop()
     if (!filename) return
     
-    const filePath = join(process.cwd(), 'public', 'uploads', filename)
+    const filePath = join(process.cwd(), 'uploads', filename)
     
     // Check if file exists and delete it
     if (existsSync(filePath)) {
@@ -140,7 +141,7 @@ export async function POST(req: NextRequest) {
     const filename = `${timestamp}-${randomString}.${extension}`
 
     // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads')
+    const uploadsDir = join(process.cwd(), 'uploads')
     if (!existsSync(uploadsDir)) {
       await mkdir(uploadsDir, { recursive: true })
     }
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
     await writeFile(filePath, buffer)
 
     // Return the URL path
-    const url = `/uploads/${filename}`
+    const url = `/api/images/${filename}`
 
     return NextResponse.json({ 
       url,

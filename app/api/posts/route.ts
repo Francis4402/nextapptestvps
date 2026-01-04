@@ -74,11 +74,11 @@ export async function POST(req: NextRequest) {
     if (imageUrl && imageUrl.startsWith('/uploads/')) {
       // Check if the file actually exists on server
       const filename = imageUrl.split('/').pop();
-      const filePath = join(process.cwd(), 'public', 'uploads', filename || '');
+      const filePath = join(process.cwd(), 'uploads', filename || '');
       
       if (!existsSync(filePath)) {
         console.warn(`Image file not found: ${filePath}`);
-        imageUrl = null; // Don't save image URL if file doesn't exist
+        imageUrl = null;
       }
     }
 
