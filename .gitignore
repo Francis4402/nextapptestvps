@@ -16,7 +16,7 @@ drizzle
 # next.js
 /.next/
 /out/
-/.uploads/
+/uploads
 # production
 /build
 
