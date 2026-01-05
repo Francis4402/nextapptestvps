@@ -21,7 +21,7 @@ export interface Post {
   id: string
   title: string
   content: string
-  images?: string[] // Array of image URLs
+  images?: string[]
   createdAt: Date
   updatedAt: Date
 }

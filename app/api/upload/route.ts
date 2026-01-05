@@ -34,151 +34,146 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const files = formData.getAll('files') as File[]
     
-    // Support single file upload for backward compatibility
     const file = formData.get('file') as File
     const filesToProcess = files.length > 0 ? files : file ? [file] : []
 
     if (filesToProcess.length === 0) {
-      return NextResponse.json(
-        { error: 'No files provided' },
-        { status: 400 }
-      )
-    }
-
-    // Limit to 5 files maximum
-    if (filesToProcess.length > 5) {
-      return NextResponse.json(
-        { error: 'Maximum 5 files allowed' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'No files provided' }, { status: 400 })
     }
 
     const results = []
+    const MAX_FILE_SIZE = 1 * 1024 * 1024 // 1MB
     
     for (const file of filesToProcess) {
       // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']
-      if (!file.type.startsWith('image/') || !allowedTypes.includes(file.type)) {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+      if (!allowedTypes.includes(file.type)) {
         return NextResponse.json(
-          { error: `File ${file.name} must be a valid image (JPEG, PNG, WEBP, GIF, SVG)` },
-          { status: 400 }
-        )
-      }
-
-      // Validate file size (max 10MB per image)
-      const MAX_SIZE = 2 * 1024 * 1024 // 1MB
-      if (file.size > MAX_SIZE) {
-        return NextResponse.json(
-          { error: `File ${file.name} size must be less than 10MB` },
+          { error: `File ${file.name} must be JPEG, PNG, WEBP, or GIF` },
           { status: 400 }
         )
       }
 
       // Convert file to buffer
       const bytes = await file.arrayBuffer()
-      const arrayBuffer = bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes).buffer
-      let buffer = Buffer.from(arrayBuffer)
-
-      // Server-side compression if still over 2MB
-      const TARGET_SIZE = 1 * 1024 * 1024 // 2MB
-      if (buffer.length > TARGET_SIZE) {
-        try {
-          console.log(`Server-side compressing ${file.name} from ${(buffer.length / 1024 / 1024).toFixed(2)}MB`)
-          
-          const sharpInstance = sharp(buffer)
-          const metadata = await sharpInstance.metadata()
-          
-          // Check if it's an SVG
-          if (metadata.format === 'svg') {
-            console.log('SVG image detected, skipping compression')
-          } else {
-            // Resize if width > 1920
-            if (metadata.width && metadata.width > 1920) {
-              sharpInstance.resize(1920, null, {
-                fit: 'inside',
-                withoutEnlargement: true
-              })
-            }
-            
-            // Compress based on format with quality optimization
-            const quality = Math.max(70, Math.floor(85 * (TARGET_SIZE / buffer.length)))
-            
-            if (metadata.format === 'jpeg') {
-              buffer = Buffer.from(await sharpInstance
-                .jpeg({ 
-                  quality,
-                  mozjpeg: true,
-                  progressive: true
-                })
-                .toBuffer())
-            } else if (metadata.format === 'png') {
-              buffer = Buffer.from(await sharpInstance
-                .png({ 
-                  compressionLevel: 9,
-                  palette: true,
-                  progressive: true
-                })
-                .toBuffer())
-            } else if (metadata.format === 'webp') {
-              buffer = Buffer.from(await sharpInstance
-                .webp({ 
-                  quality,
-                  effort: 6
-                })
-                .toBuffer())
-            } else if (metadata.format === 'gif') {
-              // Convert GIFs to WebP for better compression
-              buffer = Buffer.from(await sharpInstance
-                .webp({ 
-                  quality: 80,
-                  effort: 6
-                })
-                .toBuffer())
-            }
-            
-            console.log(`${file.name} compressed to ${(buffer.length / 1024 / 1024).toFixed(2)}MB with quality ${quality}`)
-          }
-        } catch (error) {
-          console.error(`Server-side compression failed for ${file.name}:`, error)
-          // Continue with original buffer
-        }
-      }
+      let buffer = Buffer.from(bytes)
 
       // Generate unique filename
       const timestamp = Date.now()
       const randomString = Math.random().toString(36).substring(2, 15)
       
-      // Determine extension based on format
-      const metadata = await sharp(buffer).metadata()
-      const extension = metadata.format || file.name.split('.').pop() || 'jpg'
-      const filename = `${timestamp}-${randomString}.${extension}`
+      let sharpInstance = sharp(buffer)
+      let metadata = await sharpInstance.metadata()
+      
+      // Compression function
+      const compressToUnder1MB = async (buffer: Buffer): Promise<Buffer> => {
+        let currentBuffer = buffer
+        let quality = 85
+        
+        while (currentBuffer.length > MAX_FILE_SIZE && quality >= 30) {
+          sharpInstance = sharp(currentBuffer)
+          
+          // Resize if width > 1200px
+          const targetWidth = 1200
+          if (metadata.width && metadata.width > targetWidth) {
+            sharpInstance = sharpInstance.resize(targetWidth, null, {
+              fit: 'inside',
+              withoutEnlargement: true
+            })
+          }
+          
+          // Compress based on format
+          if (metadata.format === 'jpeg' || metadata.format === 'jpg') {
+            currentBuffer = await sharpInstance
+              .jpeg({ 
+                quality: Math.max(50, quality),
+                mozjpeg: true
+              })
+              .toBuffer()
+          } else if (metadata.format === 'png') {
+            // Convert PNG to WebP for better compression
+            currentBuffer = await sharpInstance
+              .webp({ quality: 75 })
+              .toBuffer()
+          } else if (metadata.format === 'webp') {
+            currentBuffer = await sharpInstance
+              .webp({ quality: Math.max(50, quality) })
+              .toBuffer()
+          } else if (metadata.format === 'gif') {
+            currentBuffer = await sharpInstance
+              .webp({ quality: 70 })
+              .toBuffer()
+          }
+          
+          quality -= 15 // Reduce quality for next iteration
+          
+          // Update metadata
+          metadata = await sharp(currentBuffer).metadata()
+          
+          // If still too large and we can resize smaller
+          if (currentBuffer.length > MAX_FILE_SIZE && metadata.width && metadata.width > 600) {
+            // Reset and try smaller size
+            sharpInstance = sharp(buffer)
+            currentBuffer = await sharpInstance
+              .resize(600, null, {
+                fit: 'inside',
+                withoutEnlargement: true
+              })
+              .jpeg({ quality: 70 })
+              .toBuffer()
+          }
+        }
+        
+        // Final check - if still too large, use last resort
+        if (currentBuffer.length > MAX_FILE_SIZE) {
+          sharpInstance = sharp(currentBuffer)
+          currentBuffer = await sharpInstance
+            .resize(400, null, { fit: 'inside' })
+            .jpeg({ quality: 60 })
+            .toBuffer()
+        }
+        
+        return currentBuffer
+      }
 
-      // Create uploads directory if it doesn't exist
+      // Compress if needed
+      if (buffer.length > MAX_FILE_SIZE) {
+        buffer = await compressToUnder1MB(buffer) as any
+        
+        // Final verification
+        if (buffer.length > MAX_FILE_SIZE) {
+          return NextResponse.json(
+            { error: `Unable to compress ${file.name} to under 1MB. Please use a smaller image.` },
+            { status: 400 }
+          )
+        }
+      }
+
+      // Get final format
+      const finalMetadata = await sharp(buffer).metadata()
+      const finalFormat = finalMetadata.format || 'jpg'
+      const filename = `${timestamp}-${randomString}.${finalFormat}`
+
+      // Save file
       const uploadsDir = join(process.cwd(), 'uploads')
       if (!existsSync(uploadsDir)) {
         await mkdir(uploadsDir, { recursive: true })
       }
 
-      // Save file to uploads directory
       const filePath = join(uploadsDir, filename)
       await writeFile(filePath, buffer)
 
-      // Return the URL path
-      const url = `/api/images/${filename}`
-
       results.push({
-        url,
+        url: `/api/images/${filename}`,
         filename,
         size: buffer.length,
         originalSize: file.size,
-        type: file.type,
-        compressed: buffer.length < file.size,
-        compressionRatio: Math.round((1 - buffer.length / file.size) * 100),
-        name: file.name
+        isUnder1MB: buffer.length <= MAX_FILE_SIZE,
+        compressed: buffer.length < file.size
       })
     }
 
-    return NextResponse.json(filesToProcess.length === 1 ? results[0] : results)
+    return NextResponse.json(results.length === 1 ? results[0] : results)
 
   } catch (error) {
     console.error('Upload error:', error)

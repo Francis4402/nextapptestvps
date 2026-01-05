@@ -4,6 +4,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../utils/authOptions";
 import { PostFormProps } from "../types";
+import { revalidateTag } from "next/cache";
 
 
 
@@ -19,7 +20,9 @@ export const getPosts = async () => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session?.accessToken}`,
         },
-        cache: 'no-store',
+        next: {
+            tags: ['posts']
+        },
     });
 
 
@@ -33,7 +36,9 @@ export const getPost = async (id: string) => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            cache: 'no-store',
+            next: {
+                tags: ['posts']
+            },
         });
         return res.json();
     } catch (error) {
@@ -60,6 +65,8 @@ export const createPost = async (postData: PostFormProps) => {
         if (!res.ok) {
             throw new Error(data.error || 'Failed to create post')
         }
+
+        revalidateTag('posts', 'max')
 
         return data
     } catch (error) {
@@ -88,6 +95,8 @@ export const updatePost = async (postData: PostFormProps & { id: string }) => {
             throw new Error(data.error || 'Failed to update post')
         }
 
+        revalidateTag('posts', 'max')
+
         return data
     } catch (error) {
         console.error("Service error:", error)
@@ -104,6 +113,8 @@ export const deletePost = async (id: string) => {
             },
             cache: 'no-store',
         });
+
+        revalidateTag('posts', 'max')
 
         return res.json();
     } catch (error) {
@@ -124,6 +135,8 @@ export async function deleteAllPosts() {
       const error = await response.json();
       throw new Error(error.error || 'Failed to delete all posts');
     }
+
+    revalidateTag('posts', 'max')
 
     return await response.json();
   } catch (error) {
