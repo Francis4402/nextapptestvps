@@ -13,6 +13,7 @@ export interface PostFormProps {
         title?: string;
         content?: string;
         image?: string[] | null;
+        price: string
     };
     mode?: 'create' | 'edit';
 }
@@ -22,8 +23,9 @@ export interface Post {
   title: string
   content: string
   images?: string[]
-  createdAt: Date
-  updatedAt: Date
+  price: string
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 export interface User {
@@ -56,4 +58,25 @@ export interface ResetPasswordType {
     token: string;
     newPassword: string;
 };
-  
+
+export interface CartItems {
+  id: string
+  title: string
+  content: string
+  images?: string[]
+  price: string
+}
+
+
+export interface CartStore {
+    cart: CartItems[],
+    addToCart: (product: CartItems) => void
+    removeFromCart: (id: string) => void
+    clearCart: () => void
+    getTotalItems: () => number
+    getItemById: (id: string) => CartItems | undefined
+    getSubTotal: () => number
+    getTax: () => number
+    getShipping: () => number
+    getTotal: () => number
+}

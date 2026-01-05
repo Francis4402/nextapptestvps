@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
         const token = authHeader.split(" ")[1]
 
         let decoded
+        
         try {
           decoded = jwt.verify(token, process.env.AUTH_SECRET as string)
         } catch {
@@ -45,14 +46,15 @@ export async function POST(req: NextRequest) {
 
     const token = authHeader.split(" ")[1]
 
-    let decoded
+    let decoded;
+    
     try {
       decoded = jwt.verify(token, process.env.AUTH_SECRET as string)
     } catch {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
-    const body = await req.json()
+    const body = await req.json();
 
     // Check for duplicate posts
     const existingPost = await db
@@ -97,12 +99,14 @@ export async function POST(req: NextRequest) {
         title: body.title,
         content: body.content,
         images: imageUrls.length > 0 ? imageUrls : null,
+        price: body.price
       })
       .returning({
         id: postTable.id,
         title: postTable.title,
         content: postTable.content,
         images: postTable.images,
+        price: postTable.price,
         createdAt: postTable.createdAt,
         updatedAt: postTable.updatedAt,
       })

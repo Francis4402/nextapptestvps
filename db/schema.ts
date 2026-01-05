@@ -18,6 +18,7 @@ export const postTable = pgTable("posts", {
   title: varchar({ length: 255 }).notNull(),
   content: varchar("content", { length: 5000 }).notNull(),
   images: text("images").array(),
+  price: text("price").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

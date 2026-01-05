@@ -42,7 +42,8 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
     defaultValues: {
       title: initialData?.title || '',
       content: initialData?.content || '',
-      images: initialData?.image || [], // Initialize as array
+      images: initialData?.image || [],
+      price: initialData?.price || '',
     }
   })
 
@@ -190,6 +191,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
         title: data.title,
         content: data.content,
         images: uploadedUrls,
+        price: data.price
       }
 
       // Add ID for update mode
@@ -297,6 +299,28 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                         placeholder="Write your post content here..."
                         className="min-h-[250px] resize-y"
                         disabled={isSubmitting || isUploading}
+                      />
+                    </FormControl>
+                    <FormDescription className="flex justify-between">
+                      <span>Your main post content</span>
+                      <span>{field.value ? field.value.length : 0} / 5000</span>
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Price *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        value={field.value || ""} 
+                        placeholder='Enter Price' 
                       />
                     </FormControl>
                     <FormDescription className="flex justify-between">
