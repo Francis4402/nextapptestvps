@@ -14,18 +14,23 @@ export interface PostFormProps {
         content?: string;
         image?: string[] | null;
         price: string
+        quantity?: number
     };
     mode?: 'create' | 'edit';
 }
 
 export interface Post {
-  id: string
-  title: string
-  content: string
-  images?: string[]
-  price: string
-  createdAt?: Date
-  updatedAt?: Date
+    id: string
+    title: string
+    content: string
+    images?: string[]
+    price: string
+    quantity: number
+    cartQty: number
+    increaseQty: number
+    decreaseQty: number
+    createdAt?: Date
+    updatedAt?: Date
 }
 
 export interface User {
@@ -60,11 +65,15 @@ export interface ResetPasswordType {
 };
 
 export interface CartItems {
-  id: string
-  title: string
-  content: string
-  images?: string[]
-  price: string
+    id: string
+    title: string
+    content: string
+    images?: string[]
+    price: string
+    quantity: number
+    cartQty: number
+    increaseQty: number
+    decreaseQty: number
 }
 
 
@@ -79,4 +88,6 @@ export interface CartStore {
     getTax: () => number
     getShipping: () => number
     getTotal: () => number
+    increaseQty: (id:string) => void
+    decreaseQty: (id:string) => void
 }

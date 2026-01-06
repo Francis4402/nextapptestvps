@@ -76,6 +76,8 @@ export async function PUT(req: NextRequest) {
         title: body.title,
         content: body.content,
         images: newImages.length > 0 ? newImages : null,
+        price: body.price,
+        quantity: body.quantity,
         updatedAt: new Date(),
       })
       .where(eq(postTable.id, id))
@@ -266,60 +268,3 @@ async function deleteImageFiles(imageUrls: string[]) {
         results
     };
 }
-
-// Updated helper function to handle both URL formats
-// async function deleteImageFile(imageUrl: string) {
-//     try {
-//         let filename: string;
-
-//         // Handle both URL formats: /uploads/filename.jpg and /api/images/filename.jpg
-//         if (imageUrl.startsWith('/api/images/')) {
-//             filename = imageUrl.substring('/api/images/'.length);
-//         } else if (imageUrl.startsWith('/uploads/')) {
-//             filename = imageUrl.substring('/uploads/'.length);
-//         } else {
-//             return {
-//                 success: false,
-//                 error: 'Invalid image URL format'
-//             };
-//         }
-
-//         // Security check
-//         if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-//             return {
-//                 success: false,
-//                 error: 'Invalid filename'
-//             };
-//         }
-
-//         // Use the UPLOAD_DIR (same as in upload route)
-//         const UPLOAD_DIR = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
-//         const filePath = join(UPLOAD_DIR, filename);
-        
-//         // Check if file exists
-//         if (!existsSync(filePath)) {
-//             console.warn(`Image file not found: ${filePath}`);
-//             return {
-//                 success: false,
-//                 error: 'Image file not found',
-//                 warning: true
-//             };
-//         }
-
-//         // Delete the file
-//         await unlink(filePath);
-//         console.log(`Successfully deleted image: ${filename}`);
-        
-//         return {
-//             success: true,
-//             message: `Image file deleted: ${filename}`
-//         };
-        
-//     } catch (error) {
-//         console.error('Error in deleteImageFile:', error);
-//         return {
-//             success: false,
-//             error: error instanceof Error ? error.message : 'Unknown error deleting image'
-//         };
-//     }
-// }

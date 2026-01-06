@@ -1,4 +1,4 @@
-import { pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum('user_role', ['User', 'Admin']);
 
@@ -19,6 +19,7 @@ export const postTable = pgTable("posts", {
   content: varchar("content", { length: 5000 }).notNull(),
   images: text("images").array(),
   price: text("price").notNull(),
+  quantity: integer('quantity').default(1),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/sonner";
 import Provider from "./provider/Provider";
 import { getServerSession } from "next-auth";
 import { authOptions } from "./utils/authOptions";
-import Navbar from "./shared/Navbar";
 
 
 const geistSans = Geist({
@@ -38,7 +37,6 @@ export default async function RootLayout({
       >
         <Provider session={session}>
           <Toaster position="top-right" duration={1000} />
-          <Navbar />
           {children}
         </Provider>
       </body>

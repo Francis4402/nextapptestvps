@@ -44,6 +44,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
       content: initialData?.content || '',
       images: initialData?.image || [],
       price: initialData?.price || '',
+      quantity: initialData?.quantity || 1,
     }
   })
 
@@ -191,7 +192,8 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
         title: data.title,
         content: data.content,
         images: uploadedUrls,
-        price: data.price
+        price: data.price,
+        quantity: data.quantity
       }
 
       // Add ID for update mode
@@ -243,7 +245,7 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
   // Update form value when imagePreviews change
   useEffect(() => {
     const imageUrls = imagePreviews
-      .filter(preview => !preview.file) // Only include URLs (not blobs)
+      .filter(preview => !preview.file)
       .map(preview => preview.previewUrl)
     
     form.setValue('images', imageUrls)
@@ -323,10 +325,26 @@ const PostForm = ({ className, initialData, mode = 'create', ...props }: PostFor
                         placeholder='Enter Price' 
                       />
                     </FormControl>
-                    <FormDescription className="flex justify-between">
-                      <span>Your main post content</span>
-                      <span>{field.value ? field.value.length : 0} / 5000</span>
-                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number"
+                        {...field} 
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                        placeholder='Enter Quantity' 
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

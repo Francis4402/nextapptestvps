@@ -73,8 +73,9 @@ export async function POST(req: NextRequest) {
 
     // Validate image URLs if provided
     let imageUrls: string[] = []
+    
     if (body.images && Array.isArray(body.images)) {
-      // Filter out invalid URLs and check if files exist
+      
       for (const imageUrl of body.images) {
         if (imageUrl && imageUrl.startsWith('/api/images/')) {
           const filename = imageUrl.split('/').pop()
@@ -99,17 +100,10 @@ export async function POST(req: NextRequest) {
         title: body.title,
         content: body.content,
         images: imageUrls.length > 0 ? imageUrls : null,
-        price: body.price
+        price: body.price,
+        quantity: body.quantity
       })
-      .returning({
-        id: postTable.id,
-        title: postTable.title,
-        content: postTable.content,
-        images: postTable.images,
-        price: postTable.price,
-        createdAt: postTable.createdAt,
-        updatedAt: postTable.updatedAt,
-      })
+      .returning()
 
     return NextResponse.json(newPost[0])
     

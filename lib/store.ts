@@ -11,16 +11,62 @@ export const useCartStore = create<CartStore>()(
 
                 addToCart: (product) =>
                     set((state) => {
-                        const exists = state.cart.some(
+                        const existing = state.cart.find(
                             (item) => item.id === product.id
                         )
 
-                        if (exists) return state
+                        // If already in cart → increase by 1
+                        if (existing) {
+                            if (existing.cartQty >= existing.quantity) {
+                                return state // stop at DB quantity
+                            }
 
+                            return {
+                                cart: state.cart.map((item) =>
+                                    item.id === product.id
+                                        ? {
+                                              ...item,
+                                              cartQty: item.cartQty + 1,
+                                          }
+                                        : item
+                                ),
+                            }
+                        }
+
+                        // First time add → cartQty starts at 1
                         return {
-                            cart: [...state.cart, product],
+                            cart: [
+                                ...state.cart,
+                                {
+                                    ...product,
+                                    cartQty: 1,
+                                },
+                            ],
                         }
                     }),
+
+                increaseQty: (id) =>
+                    set((state) => ({
+                        cart: state.cart.map((item) =>
+                            item.id === id && item.cartQty < item.quantity
+                                ? { ...item, cartQty: item.cartQty + 1 }
+                                : item
+                        ),
+                    })),
+
+                decreaseQty: (id) =>
+                    set((state) => ({
+                        cart: state.cart
+                            .map((item) =>
+                                item.id === id
+                                    ? {
+                                          ...item,
+                                          cartQty: item.cartQty - 1,
+                                      }
+                                    : item
+                            )
+                            .filter((item) => item.cartQty > 0),
+                    })),
 
                 removeFromCart: (id) =>
                     set((state) => ({
@@ -29,20 +75,22 @@ export const useCartStore = create<CartStore>()(
 
                 clearCart: () => set({ cart: [] }),
 
-                getTotalItems: () => get().cart.length,
+                getTotalItems: () =>
+                    get().cart.reduce((sum, item) => sum + item.cartQty, 0),
 
                 getItemById: (id) =>
                     get().cart.find((item) => item.id === id),
 
                 getSubTotal: () =>
                     get().cart.reduce(
-                        (sum, item) => sum + Number(item.price),
+                        (sum, item) =>
+                            sum + Number(item.price) * item.cartQty,
                         0
                     ),
 
 
                 getTax: () => {
-                    const taxRate = 0.05 // 5%
+                    const taxRate = 0.10 // 5%
                     return get().getSubTotal() * taxRate
                 },
 

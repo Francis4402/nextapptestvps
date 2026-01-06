@@ -10,11 +10,13 @@ import {
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useCartStore } from "@/lib/store"
-import { Trash2 } from "lucide-react"
+import { Minus, Plus, Trash2 } from "lucide-react"
 
 export default function CartPage() {
     const {
         cart,
+        increaseQty,
+        decreaseQty,
         removeFromCart,
         clearCart,
         getSubTotal,
@@ -48,15 +50,53 @@ export default function CartPage() {
                         {cart.map((item) => (
                             <div
                                 key={item.id}
-                                className="flex items-center justify-between"
+                                className="flex items-center justify-between border-b pb-4"
                             >
-                                <div>
-                                    <p className="font-medium">{item.title}</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        ৳ {Number(item.price).toLocaleString()}
+                                {/* Left */}
+                                <div className="space-y-1">
+                                    <p className="font-medium">
+                                        {item.title}{" "}
+                                        <span className="text-muted-foreground">
+                                            × {item.cartQty}
+                                        </span>
                                     </p>
+
+                                    <p className="text-sm text-muted-foreground">
+                                        ৳ {Number(item.price).toLocaleString()} each
+                                    </p>
+
+                                    <p className="text-sm font-semibold">
+                                        Line total: ৳{" "}
+                                        {(Number(item.price) * item.cartQty).toLocaleString()}
+                                    </p>
+
+                                    {/* Quantity controls */}
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <Button
+                                            size="icon"
+                                            variant="outline"
+                                            onClick={() => decreaseQty(item.id)}
+                                            disabled={item.cartQty <= 1}
+                                        >
+                                            <Minus className="h-4 w-4" />
+                                        </Button>
+
+                                        <span className="w-8 text-center font-medium">
+                                            {item.cartQty}
+                                        </span>
+
+                                        <Button
+                                            size="icon"
+                                            variant="outline"
+                                            onClick={() => increaseQty(item.id)}
+                                            disabled={item.cartQty >= item.quantity}
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
 
+                                {/* Right */}
                                 <Button
                                     variant="ghost"
                                     size="icon"
