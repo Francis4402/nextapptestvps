@@ -103,6 +103,7 @@ export const useCartStore = create<CartStore>()(
             }),
             {
                 name: "cart",
+                skipHydration: true,
             }
         )
     )

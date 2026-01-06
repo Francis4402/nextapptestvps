@@ -46,6 +46,7 @@ const AllPosts = async () => {
                     </h3>
                     <p className="mt-1 text-sm text-gray-500">{product.content}</p>
                     <p className="mt-1 text-sm text-gray-500 font-bold">TK: {product.price}</p>
+                    <p className="mt-1 text-sm text-gray-500 font-bold">Quantity: {product.quantity}</p>
                   </div>
                   <div className='flex gap-2 items-center'>
                     <AddToCartButton product={product} />
